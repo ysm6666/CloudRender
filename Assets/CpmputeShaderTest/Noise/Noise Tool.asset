@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0fd679723bc9f9044a74425c55c09f31, type: 3}
+  m_Name: Noise Tool
+  m_EditorClassIdentifier: 
+  computeShader: {fileID: 7200000, guid: e5ad30e04176e174aa962a2d713d15c3, type: 3}
+  frequency: 6
+  resolutionSetting: 64
+  noiseType: 4
+  colorSpace: 2
+  noiseMode: 2
+  ZSliced: 0.5

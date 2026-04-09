@@ -1,0 +1,368 @@
+#pragma kernel PerlinMain
+#pragma kernel WorleyMain
+#pragma kernel PerlinWorleyMain
+#pragma kernel PerlinWorley3DMain
+#pragma kernel GetSlicedTex
+#pragma kernel DetailNoiseMain
+RWTexture2D<float4> _2DNoise;
+RWTexture3D<float4> _3DNoise;
+float frequency;
+int resolution;
+float gamma;
+float z_sliced;
+float random(float2 x)
+{
+    return frac(sin(dot(x,float2(12.9898,78.233)))*43758.5453);
+}
+
+float ValueNoise(float2 uv)
+{
+   float2 int_num_uv=float2(floor(uv.x),floor(uv.y));
+   float2 float_num_uv=float2(uv.x-floor(uv.x),uv.y-floor(uv.y));
+   float left_bottom_val=random(int_num_uv);
+   float right_bottom_val=random(int_num_uv+float2(1,0));
+   float left_top_val=random(int_num_uv+float2(0,1));
+   float right_top_val=random(int_num_uv+float2(1,1));
+   float x_lerp_factor=float_num_uv.x*float_num_uv.x*(3-2*float_num_uv.x);
+   float y_lerp_factor=float_num_uv.y*float_num_uv.y*(3-2*float_num_uv.y);
+   float top_mix=lerp(left_top_val,right_top_val,x_lerp_factor);
+   float bottom_mix=lerp(left_bottom_val,right_bottom_val,x_lerp_factor);
+   return lerp(bottom_mix,top_mix,y_lerp_factor);
+}
+
+float FBMValueNoise(float2 uv){
+    float noiseVal1=ValueNoise(uv*8);
+    float noiseVal2=ValueNoise(uv*16)*0.5;
+    float noiseVal3=ValueNoise(uv*32)*0.25;
+    float noiseVal4=ValueNoise(uv*64)*0.125;
+    return (noiseVal1+noiseVal2+noiseVal3+noiseVal4)*0.5;    
+}
+
+float pcgHash01(uint state)
+{
+    state = state * 747796405u + 2891336453u;
+    uint word=((state>>((state>>28u)+4u))^state)*277803737u;
+    uint result = (word >> 22u) ^ word;
+    return float(result) / 4294967295.0; 
+}
+
+uint pcgHash_uint(uint state)
+{
+    state = state * 747796405u + 2891336453u;
+    uint word=((state>>((state>>28u)+4u))^state)*277803737u;
+    uint result = (word >> 22u) ^ word;
+    return result;
+}
+
+float2 getGradient(uint2 uv)
+{
+    uint seed=uv.x*1973u+uv.y*9277u;
+    float randomVal=pcgHash01(seed);
+    float angle=2*3.1415926*randomVal;
+    return float2(cos(angle),sin(angle));
+}
+
+float SmoothLerpFactor(float t)
+{
+    return t * t * (3 - 2 * t);
+}
+
+float FixSmoothLerpFactor(float t)
+{
+    return t*t*t*(6*t*t-15*t+10);
+}
+
+float perlinNoise(float2 uv)
+{
+    uint2 int_uv=floor(uv);
+    float2 float_uv=frac(uv);
+    
+    float2 left_bottom_grad=getGradient(int_uv);
+    float2 right_bottom_grad=getGradient(int_uv+uint2(1,0));
+    float2 left_top_grad=getGradient(int_uv+uint2(0,1));
+    float2 right_top_grad=getGradient(int_uv+uint2(1,1));
+    
+    float2 left_bottom_vector=uv-int_uv;
+    float2 right_bottom_vector=uv-(int_uv+float2(1,0));
+    float2 left_top_vector=uv-(int_uv+float2(0,1));
+    float2 right_top_vector=uv-(int_uv+float2(1,1));
+    
+    float left_bottom_val=dot(left_bottom_grad,left_bottom_vector);
+    float right_bottom_val=dot(right_bottom_grad,right_bottom_vector);
+    float left_top_val=dot(left_top_grad,left_top_vector);
+    float right_top_val=dot(right_top_grad,right_top_vector);
+
+    float x_lerp_factor=FixSmoothLerpFactor(float_uv.x);
+    float y_lerp_factor=FixSmoothLerpFactor(float_uv.y);
+
+    // float x_lerp_factor=SmoothLerpFactor(float_uv.x);
+    // float y_lerp_factor=SmoothLerpFactor(float_uv.y);
+
+    float bottom_mix=lerp(left_bottom_val,right_bottom_val,x_lerp_factor);
+    float top_mix=lerp(left_top_val,right_top_val,x_lerp_factor);
+
+    return lerp(bottom_mix,top_mix,y_lerp_factor);
+}
+
+float FBMPerlinNoise(float2 uv,float baseFrequency){
+    float sum=0.0f;
+    float frequency=baseFrequency;
+    float baseStrength=1.0f;
+    float totalStrength=0;
+    for (int x=1; x<=3; x++)
+    {
+        totalStrength+=baseStrength;
+        sum+=perlinNoise(uv*frequency)*baseStrength;
+        frequency*=2;
+        baseStrength*=0.5;
+    }
+    return sum/totalStrength;
+}
+
+float2 hash22(uint2 uv)
+{
+    uint seed=uv.x*1973u+uv.y*9277u;
+    uint seed2=uv.x*2654435761u+uv.y*2246822519u;
+    float randomVal=pcgHash01(seed);
+    float randomVal2=pcgHash01(seed2);
+    return float2(randomVal,randomVal2);
+}
+
+
+float worleyNoise(float2 uv,float baseFrequency)
+{
+    uint2 int_uv=floor(uv);
+    float2 float_uv=frac(uv);
+    float minDis=5.5f;
+    for (int x=-1; x<=1; x++)
+    {
+        for (int y=-1; y<=1; y++)
+        {
+            int2 int_uv_with_offset=int_uv+uint2(x,y);
+            int_uv_with_offset.x=(int_uv_with_offset.x% baseFrequency+ baseFrequency)% baseFrequency;
+            int_uv_with_offset.y=(int_uv_with_offset.y% baseFrequency+ baseFrequency)% baseFrequency;
+            float2 specialPoint_local_uv=hash22(int_uv_with_offset);
+            // float2 specialPoint_uv=specialPoint_local_uv+int_uv_with_offset;
+            //float2 vector_to_specialPoint=specialPoint_uv-uv;
+            float2 vector_to_specialPoint=specialPoint_local_uv-float_uv+float2(x,y);
+            float dis=length(vector_to_specialPoint);
+            minDis=min(minDis,dis);
+        }
+    }
+    return minDis;
+}
+
+float FBMWorleyNoise(float2 uv,float baseFrequency)
+{
+    float sum=0.0f;
+    float frequency=baseFrequency;
+    float baseStrength=1.0f;
+    float totalStrength=0;
+    for (int x=1; x<=3; x++)
+    {
+        totalStrength+=baseStrength;
+        sum+=worleyNoise(uv*frequency,frequency)*baseStrength;
+        frequency*=2;
+        baseStrength*=0.5;
+    }
+    return sum/totalStrength;
+}
+
+float remap(float x,float oldmin,float oldmax,float newmin,float newmax)
+{
+    return newmin+(x-oldmin)/max(oldmax-oldmin,0.000001f)*(newmax-newmin);
+}
+
+float3 GetGradient3D(uint3 uvw)
+{
+    uint seed=uvw.x*1973u+uvw.y*9277u+uvw.z*2654435761u;
+    uint randomVal=pcgHash_uint(seed)%12u;
+    float x=(randomVal&1u)?-1:1;
+    float y=(randomVal&2u)?-1:1;
+    if (randomVal<4u)return float3(x,y,0);
+    if (randomVal<8u)return float3(x,0,y);
+    return float3(0,x,y);
+}
+
+float Get3DPerlinNoise(float3 uvw)
+{
+    uint3 int_uvw=floor(uvw);
+    float3 float_uvw=frac(uvw);
+    float x_lerp = FixSmoothLerpFactor(float_uvw.x);
+    float y_lerp = FixSmoothLerpFactor(float_uvw.y);
+    float z_lerp = FixSmoothLerpFactor(float_uvw.z);
+
+    float3 bottom_left_down_gradient=GetGradient3D(int_uvw);
+    float3 bottom_left_up_gradient=GetGradient3D(int_uvw+uint3(0,1,0));
+    float3 bottom_right_up_gradient=GetGradient3D(int_uvw+uint3(1,1,0));
+    float3 bottom_right_down_gradient=GetGradient3D(int_uvw+uint3(1,0,0));
+    float3 top_left_down_gradient=GetGradient3D(int_uvw+uint3(0,0,1));
+    float3 top_left_up_gradient=GetGradient3D(int_uvw+uint3(0,1,1));
+    float3 top_right_up_gradient=GetGradient3D(int_uvw+uint3(1,1,1));
+    float3 top_right_down_gradient=GetGradient3D(int_uvw+uint3(1,0,1));
+    
+    float3 bottom_left_down_vector=float3(0,0,0)-float_uvw;
+    float3 bottom_left_up_vector=float3(0,1,0)-float_uvw;
+    float3 bottom_right_up_vector=float3(1,1,0)-float_uvw;
+    float3 bottom_right_down_vector=float3(1,0,0)-float_uvw;
+    float3 top_left_down_vector=float3(0,0,1)-float_uvw;
+    float3 top_left_up_vector=float3(0,1,1)-float_uvw;
+    float3 top_right_up_vector=float3(1,1,1)-float_uvw;
+    float3 top_right_down_vector=float3(1,0,1)-float_uvw;
+
+    float bottom_left_down_val=dot(bottom_left_down_gradient,bottom_left_down_vector);
+    float bottom_left_up_val=dot(bottom_left_up_gradient,bottom_left_up_vector);
+    float bottom_right_up_val=dot(bottom_right_up_gradient,bottom_right_up_vector);
+    float bottom_right_down_val=dot(bottom_right_down_gradient,bottom_right_down_vector);
+    float top_left_down_val=dot(top_left_down_gradient,top_left_down_vector);
+    float top_left_up_val=dot(top_left_up_gradient,top_left_up_vector);
+    float top_right_up_val=dot(top_right_up_gradient,top_right_up_vector);
+    float top_right_down_val=dot(top_right_down_gradient,top_right_down_vector);
+
+    float  _mix_bottom_down=lerp(bottom_left_down_val,bottom_right_down_val,x_lerp);
+    float _mix_bottom_up=lerp(bottom_left_up_val,bottom_right_up_val,x_lerp);
+    float _mix_bottom=lerp(_mix_bottom_down,_mix_bottom_up, y_lerp);
+    float _mix_top_down=lerp(top_left_down_val,top_right_down_val,x_lerp);
+    float _mix_top_up=lerp(top_left_up_val,top_right_up_val,x_lerp);
+    float _mix_top=lerp(_mix_top_down,_mix_top_up, y_lerp);
+    float noiseVal=lerp(_mix_bottom,_mix_top,z_lerp);
+    return noiseVal;
+}
+
+float3 hash33(uint3 uvw)
+{
+    uint3 q=uvw*uint3(1973u,9277u,2654435761u);
+    q=(q.x^q.y^q.z)*uint3(1973u,9277u,2654435761u);
+    return float3(q.x,q.y,q.z)/4294967295.0;
+}
+
+float worleyNoise3D(float3 uvw,float frequency)
+{
+    uint3 int_uv=floor(uvw);
+    float3 float_uvw=frac(uvw);
+    float minDis=1.8;
+    for (int x=-1; x<=1; x++)
+    {
+        for (int y=-1; y<=1; y++)
+        {
+            for (int z=-1; z<=1; z++)
+            {
+                int3 int_uvw_with_offset=int_uv+uint3(x,y,z);
+                int_uvw_with_offset.x=(int_uvw_with_offset.x%frequency+frequency)%frequency;
+                int_uvw_with_offset.y=(int_uvw_with_offset.y%frequency+frequency)%frequency;
+                int_uvw_with_offset.z=(int_uvw_with_offset.z%frequency+frequency)%frequency;
+                float3 specialPoint_local_uvw=hash33(int_uvw_with_offset);
+                float3 vector_to_specialPoint=specialPoint_local_uvw-float_uvw+int3(x,y,z);
+                float distance=length(vector_to_specialPoint);
+                minDis=min(minDis,distance);
+            }
+        }
+    }
+    return minDis;
+}
+
+float FBMWorley3D(float3 uvw,float baseFrequency)
+{
+    float sum=0.0f;
+    float frequency=baseFrequency;
+    float baseStrength=1.0f;
+    float totalStrength=0;
+    for (int x=1; x<=3; x++)
+    {
+        totalStrength+=baseStrength;
+        sum+=worleyNoise3D(uvw*frequency,frequency)*baseStrength;
+        frequency*=2;
+        baseStrength*=0.5;
+    }
+    return sum/totalStrength;
+}
+
+float FBMPerlinNoise3D(float3 uvw,float baseFrequency)
+{
+    float sum=0.0f;
+    float frequency=baseFrequency;
+    float baseStrength=1.0f;
+    float totalStrength=0;
+    for (int x=1; x<=3; x++)
+    {
+        totalStrength+=baseStrength;
+        sum+=Get3DPerlinNoise(uvw*frequency)*baseStrength;
+        frequency*=2;
+        baseStrength*=0.5;
+    }
+    return sum/totalStrength;
+}
+
+[numthreads(8,8,1)]
+void PerlinMain (uint3 id : SV_DispatchThreadID)
+{
+    float2 uv=float2((float)id.x/(float)resolution,(float)id.y/(float)resolution);
+    float noiseVal=FBMPerlinNoise(uv,frequency)*0.5 + 0.5;
+    noiseVal=pow(noiseVal,gamma);
+    _2DNoise[id.xy]=float4(noiseVal,noiseVal,noiseVal,1);
+}
+
+[numthreads(8,8,1)]
+void WorleyMain (uint3 id : SV_DispatchThreadID)
+{
+    float2 uv=float2((float)id.x/(float)resolution,(float)id.y/(float)resolution);
+    //float noiseVal=worleyNoise(uv*frequency);
+    float noiseVal=1-FBMWorleyNoise(uv,frequency);
+    noiseVal=pow(noiseVal,gamma);
+    _2DNoise[id.xy]=float4(noiseVal,noiseVal,noiseVal,1);
+}
+
+[numthreads(8,8,1)]
+void PerlinWorleyMain(uint3 id: SV_DispatchThreadID)
+{
+    float2 uv=float2((float)id.x/(float)resolution,(float)id.y/(float)resolution);
+    float WorleyFBM=FBMWorleyNoise(uv,2*frequency);
+    float perlinNoise=FBMPerlinNoise(uv,frequency)*0.5+0.5;
+    perlinNoise*=1.5;
+    float noiseVal=saturate(remap(perlinNoise,WorleyFBM,1,0,1));
+    noiseVal=pow(noiseVal,gamma);
+    _2DNoise[id.xy]=float4(noiseVal,noiseVal,noiseVal,1);
+}
+
+[numthreads(8,8,8)]
+void PerlinWorley3DMain(uint3 id:SV_DispatchThreadID)
+{
+    float3 uvw=float3((float)id.x/(float)resolution,(float)id.y/(float)resolution,(float)id.z/(float)resolution);
+    float WorleyFBM=FBMWorley3D(uvw,2*frequency);
+    float perlinNoise=FBMPerlinNoise3D(uvw,frequency)*0.5+0.5;
+    perlinNoise*=1.5;
+    float perlinWorleyVal=saturate(remap(perlinNoise,WorleyFBM,1,0,1));
+    float channelG=1-worleyNoise3D(uvw*4,4);
+    float channelB=1-worleyNoise3D(uvw*8,8);
+    float channelA=1-worleyNoise3D(uvw*16,16);
+    channelG=pow(channelG,gamma);
+    channelB=pow(channelB,gamma);
+    channelA=pow(channelA,gamma);
+    perlinWorleyVal=pow(perlinWorleyVal,gamma);
+    _3DNoise[id.xyz]=float4(perlinWorleyVal,channelG,channelB,channelA);
+    //_3DNoise[id.xyz]=float4(channelA,channelA,channelA,channelA);
+}
+
+[numthreads(8,8,1)]
+void GetSlicedTex(uint3 id:SV_DispatchThreadID)
+{
+    uint z=uint(z_sliced*(resolution-1));
+    _2DNoise[id.xy]=_3DNoise[uint3(id.x,id.y,z)];
+}
+
+[numthreads(8,8,8)]
+void DetailNoiseMain(uint3 id: SV_DispatchThreadID)
+{
+    float3 uvw=float3((float)id.x/(float)resolution,(float)id.y/(float)resolution,(float)id.z/(float)resolution);
+    float channelR=1-worleyNoise3D(uvw.zyx*4,4);
+    float channelG=1-worleyNoise3D(uvw.zyx*8,8);
+    float channelB=1-worleyNoise3D(uvw.zyx*16,16);
+    channelR=pow(channelR,gamma);
+    channelB=pow(channelB,gamma);
+    channelG=pow(channelG,gamma);
+    _3DNoise[id.xyz]=float4(channelR,channelG,channelB,1);
+    //_3DNoise[id.xyz]=float4(channelR,channelR,channelR,1);
+    //_3DNoise[id.xyz]=float4(channelG,channelG,channelG,1);
+    //_3DNoise[id.xyz]=float4(channelB,channelB,channelB,1);
+}
+

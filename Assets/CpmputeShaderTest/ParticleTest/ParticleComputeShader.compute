@@ -1,0 +1,49 @@
+#pragma kernel CSMain
+struct Particle
+{
+ float3 pos;
+ float3 vel;
+ float lifetime;
+};
+
+RWStructuredBuffer<Particle> _ParticleBuffer;
+float _Time;
+float _DeltaTime;
+float _Radius;
+float3 hash33(float3 p) {
+ p = frac(p * float3(.1031, .1030, .0973));
+ p += dot(p, p.yxz + 33.33);
+ return frac((p.xxy + p.yxx) * p.zyx);
+}
+
+float3 get_curl_noise(float3 p) {
+ float delta = 0.1;
+ float3 n1 = hash33(p + float3(delta, 0, 0));
+ float3 n2 = hash33(p - float3(delta, 0, 0));
+ float3 n3 = hash33(p + float3(0, delta, 0));
+ float3 n4 = hash33(p - float3(0, delta, 0));
+ float3 n5 = hash33(p + float3(0, 0, delta));
+ float3 n6 = hash33(p - float3(0, 0, delta));
+
+ float x = (n3.z - n4.z) - (n5.y - n6.y);
+ float y = (n5.x - n6.x) - (n1.z - n2.z);
+ float z = (n1.y - n2.y) - (n3.x - n4.x);
+ return normalize(float3(x, y, z));
+}
+
+[numthreads(64,1,1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+   Particle p=_ParticleBuffer[id.x];
+   float3 force=get_curl_noise(p.pos*0.5+_Time*0.1);
+   p.vel=lerp(p.vel,force,_DeltaTime*2);
+   p.pos+=p.vel*_DeltaTime*0.5;
+   p.lifetime-=_DeltaTime*0.2;
+   if (p.lifetime < 0) {
+       float3 randVal = hash33(float3(id.x, _Time, 0));
+       p.pos = normalize((randVal - 0.5) * 2.0)* _Radius; 
+       p.lifetime = 1.0;
+       p.vel = float3(0,0,0);
+   }
+   _ParticleBuffer[id.x] = p;
+}
