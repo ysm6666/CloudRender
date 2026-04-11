@@ -97,6 +97,8 @@ Shader "RayMarching/RenderCloudTest_Shape"
             SAMPLER(sampler_WeatherMap);
             TEXTURE3D(_DetailNoiseTex);
             SAMPLER(sampler_DetailNoiseTex);
+            TEXTURE2D(_CloudBackBuffer);
+            SAMPLER(sampler_CloudBackBuffer);
             
             CBUFFER_START(UnityPerMaterial)
             float4 _BoxCenter;
@@ -130,6 +132,9 @@ Shader "RayMarching/RenderCloudTest_Shape"
             float _MaxTotalStepDis;
             float4 _FlowSpeed_Shape_And_Weather;
             float _UVOffsetStrength;
+
+            int _FrameIndex;
+            float4x4 _PreVPMatrix;
             CBUFFER_END
 
             Varyings Vert(Atrributes input)
@@ -355,11 +360,59 @@ Shader "RayMarching/RenderCloudTest_Shape"
                 //return blend;
             }
 
-          
+            static  const int OrderMaxtrix[16]={
+                0,8,2,10,
+                12,4,14,6,
+                3,11,1,9,
+                15,7,13,5
+            };
+            
             
             float4 Frag(Varyings input):SV_Target
             {
-                
+                float2 pixelPos=float2(input.positionCS.xy);
+                #if UNITY_UV_STARTS_AT_TOP
+                    pixelPos.y=_ScreenParams.y-pixelPos.y;
+                #endif
+                int2 groupPos=int2(pixelPos.x%32/8,pixelPos.y%32/8);
+                int pixelIndex=groupPos.y%4*4+groupPos.x%4;
+                pixelIndex=OrderMaxtrix[pixelIndex];
+                if (pixelIndex != _FrameIndex)
+                {
+                  
+                    float4 currentworldPos_And_Depth=RestructWorldPos(input.uv);
+    
+                    float3 cameraPos = _WorldSpaceCameraPos;                    
+                    float3 worldRayDir = normalize(currentworldPos_And_Depth.xyz - cameraPos);
+                    
+                    float reprojectionDist = _ProjectionParams.z;
+                    
+                    #ifndef _Sphere_Box_Mode
+                        float3 boundsMin = _BoxCenter.xyz - _BoxSize.xyz * 0.5;
+                        float3 boundsMax = _BoxCenter.xyz + _BoxSize.xyz * 0.5;
+                        float2 boxInfo = RayBoxDst(boundsMin, boundsMax, cameraPos, 1 / (worldRayDir.xyz + 1e-5));
+                        if (boxInfo.y > 0) reprojectionDist = boxInfo.x;
+                    #else
+                        float3 sphereCenter = float3(cameraPos.x, -_EarthRadius, cameraPos.z);
+                        float2 sphereInfo = RaySphereCloudLayerDst(sphereCenter, _EarthRadius, _CloudHeightMin, _CloudHeightMax, cameraPos, worldRayDir);
+                        if (sphereInfo.y > 0) reprojectionDist = sphereInfo.x;
+                    #endif
+                    
+                    // 这是云层的真正虚拟物理位置！
+                    float3 cloudAnchorPos = cameraPos + worldRayDir * reprojectionDist;
+                    float4 preClipPos=mul(_PreVPMatrix,float4(cloudAnchorPos,1));
+                    
+                   // float4 preClipPos=mul(_PreVPMatrix,float4(currentworldPos_And_Depth.xyz,1));
+                    float4 preNdcPos=preClipPos/preClipPos.w;
+                    float2 preUV=preNdcPos.xy*0.5+0.5;
+                    bool isOutOfBounds = (preUV.x < 0.0 || preUV.x > 1.0 || preUV.y < 0.0 || preUV.y > 1.0);
+                    if (!isOutOfBounds)
+                    {
+                        float4 col = SAMPLE_TEXTURE2D(_CloudBackBuffer,sampler_CloudBackBuffer,preUV);
+                        return col;
+                    }
+                }
+                // return float4(0,1,0,0);
                 float3 cameraPos=_WorldSpaceCameraPos;
                 float4 worldPosAndDepth=RestructWorldPos(input.uv);
                 float3 worldPos=worldPosAndDepth.xyz;

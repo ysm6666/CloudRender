@@ -17,11 +17,19 @@ public class CloudRenderFeature : ScriptableRendererFeature
     {
         Material CloudMaterial;
         int downsample;
+        private int _frameIndex = 0;
+        private Matrix4x4 _PreVPMatrix;
+        private Matrix4x4 _CurrentVPMatrix;
+        private bool isFirstFrame = true;
+        RTHandle renderCloudRT;
+        RTHandle renderCloudBackBuffer;
+
         public CloudPass(Settings settings)
         {
             this.CloudMaterial = settings.CloudMaterial;
             this.renderPassEvent = settings.Event;
             this.downsample = settings.downsample;
+            
         }
 
         public void SetDownsample(int downsample)
@@ -29,12 +37,12 @@ public class CloudRenderFeature : ScriptableRendererFeature
             this.downsample = downsample;
         }
         
-        RTHandle renderCloudRT;
-        
         public void Dispose()
         {
             renderCloudRT?.Release();
             renderCloudRT = null;
+            renderCloudBackBuffer?.Release();
+            renderCloudBackBuffer = null;
         }
 
         public override void OnCameraSetup(CommandBuffer cmd, ref RenderingData renderingData)
@@ -46,6 +54,7 @@ public class CloudRenderFeature : ScriptableRendererFeature
            desc.width /= downsample;
            desc.height /= downsample;
            RenderingUtils.ReAllocateIfNeeded(ref renderCloudRT,desc,name:"TempRT");
+           RenderingUtils.ReAllocateIfNeeded(ref renderCloudBackBuffer,desc,name:"TempBackBuffer");
            renderCloudRT.rt.filterMode = FilterMode.Bilinear;
         }
 
@@ -64,12 +73,32 @@ public class CloudRenderFeature : ScriptableRendererFeature
         public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
         {
             CommandBuffer cmd = CommandBufferPool.Get("CloudRender");
+            
             SetAmbientProbe(cmd);
             context.SetupCameraProperties(renderingData.cameraData.camera);
+            
+            //获取当前帧的vp矩阵
+            Matrix4x4 projectionMatrix=GL.GetGPUProjectionMatrix(renderingData.cameraData.GetProjectionMatrix(),false);
+            Matrix4x4 viewMatrix = renderingData.cameraData.GetViewMatrix();
+            _CurrentVPMatrix=projectionMatrix*viewMatrix;
+            if (isFirstFrame)
+            {
+                _PreVPMatrix = _CurrentVPMatrix;
+                isFirstFrame = false;
+            }
+           
+            cmd.SetGlobalTexture(Shader.PropertyToID("_CloudBackBuffer"), renderCloudBackBuffer);
+            cmd.SetGlobalInt(Shader.PropertyToID("_FrameIndex"), _frameIndex);
+            cmd.SetGlobalMatrix(Shader.PropertyToID("_PreVPMatrix"), _PreVPMatrix);
+            
             var source=renderingData.cameraData.renderer.cameraColorTargetHandle;
             Blitter.BlitCameraTexture(cmd, source,renderCloudRT,CloudMaterial,0);
+            Blitter.BlitCameraTexture(cmd, renderCloudRT,renderCloudBackBuffer);
             Blitter.BlitCameraTexture(cmd, renderCloudRT, source,CloudMaterial,1);
             context.ExecuteCommandBuffer(cmd);
+
+            _PreVPMatrix = _CurrentVPMatrix;
+            _frameIndex = (_frameIndex+1) % 16;
             CommandBufferPool.Release(cmd);
         }
 
