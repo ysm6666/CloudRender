@@ -11,25 +11,30 @@ public class CloudRenderFeature : ScriptableRendererFeature
         public RenderPassEvent Event = RenderPassEvent.BeforeRenderingPostProcessing;
         [Range(1,4)]
         public int downsample = 1;
+
+        public bool useDivisionRendering = true;
     }
     
    class CloudPass : ScriptableRenderPass
     {
         Material CloudMaterial;
         int downsample;
+        private bool useDivisionRendering;
+        
         private int _frameIndex = 0;
         private Matrix4x4 _PreVPMatrix;
         private Matrix4x4 _CurrentVPMatrix;
         private bool isFirstFrame = true;
+        
         RTHandle renderCloudRT;
         RTHandle renderCloudBackBuffer;
-
+        
         public CloudPass(Settings settings)
         {
             this.CloudMaterial = settings.CloudMaterial;
             this.renderPassEvent = settings.Event;
             this.downsample = settings.downsample;
-            
+            this.useDivisionRendering = settings.useDivisionRendering;
         }
 
         public void SetDownsample(int downsample)
@@ -54,8 +59,12 @@ public class CloudRenderFeature : ScriptableRendererFeature
            desc.width /= downsample;
            desc.height /= downsample;
            RenderingUtils.ReAllocateIfNeeded(ref renderCloudRT,desc,name:"TempRT");
-           RenderingUtils.ReAllocateIfNeeded(ref renderCloudBackBuffer,desc,name:"TempBackBuffer");
            renderCloudRT.rt.filterMode = FilterMode.Bilinear;
+           if (useDivisionRendering)
+           {
+               RenderingUtils.ReAllocateIfNeeded(ref renderCloudBackBuffer,desc,name:"TempBackBuffer");
+           }
+           
         }
 
         void SetAmbientProbe(CommandBuffer cmd)
@@ -76,35 +85,47 @@ public class CloudRenderFeature : ScriptableRendererFeature
             
             SetAmbientProbe(cmd);
             context.SetupCameraProperties(renderingData.cameraData.camera);
-            
-            //获取当前帧的vp矩阵
-            Matrix4x4 projectionMatrix=GL.GetGPUProjectionMatrix(renderingData.cameraData.GetProjectionMatrix(),false);
-            Matrix4x4 viewMatrix = renderingData.cameraData.GetViewMatrix();
-            _CurrentVPMatrix=projectionMatrix*viewMatrix;
-            if (isFirstFrame)
+
+            if (useDivisionRendering)
             {
-                _PreVPMatrix = _CurrentVPMatrix;
-                isFirstFrame = false;
+                cmd.EnableShaderKeyword("_Division_Rendering");
+                //获取当前帧的vp矩阵
+                Matrix4x4 projectionMatrix=GL.GetGPUProjectionMatrix(renderingData.cameraData.GetProjectionMatrix(),false);
+                Matrix4x4 viewMatrix = renderingData.cameraData.GetViewMatrix();
+                _CurrentVPMatrix=projectionMatrix*viewMatrix;
+                if (isFirstFrame)
+                {
+                    _PreVPMatrix = _CurrentVPMatrix;
+                    isFirstFrame = false;
+                }
+                cmd.SetGlobalTexture(Shader.PropertyToID("_CloudBackBuffer"), renderCloudBackBuffer);
+                cmd.SetGlobalInt(Shader.PropertyToID("_FrameIndex"), _frameIndex);
+                cmd.SetGlobalMatrix(Shader.PropertyToID("_PreVPMatrix"), _PreVPMatrix);
             }
-           
-            cmd.SetGlobalTexture(Shader.PropertyToID("_CloudBackBuffer"), renderCloudBackBuffer);
-            cmd.SetGlobalInt(Shader.PropertyToID("_FrameIndex"), _frameIndex);
-            cmd.SetGlobalMatrix(Shader.PropertyToID("_PreVPMatrix"), _PreVPMatrix);
+            else
+            {
+                cmd.DisableShaderKeyword("_Division_Rendering");
+            }
             
             var source=renderingData.cameraData.renderer.cameraColorTargetHandle;
             Blitter.BlitCameraTexture(cmd, source,renderCloudRT,CloudMaterial,0);
-            Blitter.BlitCameraTexture(cmd, renderCloudRT,renderCloudBackBuffer);
+            
+            if (useDivisionRendering)
+            {
+                Blitter.BlitCameraTexture(cmd, renderCloudRT,renderCloudBackBuffer);
+                _PreVPMatrix = _CurrentVPMatrix;
+                _frameIndex = (_frameIndex+1) % 16;
+            }
+            
             Blitter.BlitCameraTexture(cmd, renderCloudRT, source,CloudMaterial,1);
             context.ExecuteCommandBuffer(cmd);
-
-            _PreVPMatrix = _CurrentVPMatrix;
-            _frameIndex = (_frameIndex+1) % 16;
+            
             CommandBufferPool.Release(cmd);
         }
 
         public override void OnCameraCleanup(CommandBuffer cmd)
         {
-            //Dispose();
+           
         }
     }
     public Settings settings = new Settings();

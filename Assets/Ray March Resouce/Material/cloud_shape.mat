@@ -29,6 +29,10 @@ Material:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    - _BlueTex:
+        m_Texture: {fileID: 2800000, guid: d25158ef7a361f6409bbeb2b86bb2118, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     - _BumpMap:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
@@ -166,7 +170,7 @@ Material:
     - _BaseNoiseWeight: {r: 1, g: 0.625, b: 0.25, a: 0.125}
     - _BoxCenter: {r: 0, g: 0, b: 0, a: 0}
     - _BoxSize: {r: 20000, g: 300, b: 20000, a: 0}
-    - _CloudBrightColor: {r: 1, g: 0.9000829, b: 0.7311321, a: 1}
+    - _CloudBrightColor: {r: 1, g: 0.933347, b: 0.8160377, a: 1}
     - _CloudDarkColor: {r: 0, g: 0.42645812, b: 0.6415094, a: 1}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _Cumulus: {r: 0, g: 0.6, b: 0.3, a: 0}
