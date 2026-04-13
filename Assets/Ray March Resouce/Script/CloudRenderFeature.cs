@@ -54,7 +54,7 @@ public class CloudRenderFeature : ScriptableRendererFeature
         {
            var desc = renderingData.cameraData.cameraTargetDescriptor;
            desc.depthBufferBits = 0;
-           //desc.colorFormat = RenderTextureFormat.DefaultHDR;
+           //desc.colorFormat = RenderTextureFormat.DefaultHDR; 手机端默认hdr没有alpha通道
            desc.colorFormat = RenderTextureFormat.ARGBHalf;
            desc.width /= downsample;
            desc.height /= downsample;
@@ -118,6 +118,9 @@ public class CloudRenderFeature : ScriptableRendererFeature
             }
             
             Blitter.BlitCameraTexture(cmd, renderCloudRT, source,CloudMaterial,1);
+            
+            cmd.SetGlobalTexture(Shader.PropertyToID("_CloudRT"), renderCloudRT);
+            
             context.ExecuteCommandBuffer(cmd);
             
             CommandBufferPool.Release(cmd);
