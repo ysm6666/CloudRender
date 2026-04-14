@@ -18,5 +18,6 @@
 
 
 ## 📂 目录结构
-* `/Assets/Scripts`: C# 渲染管线控制代码
-* `/Assets/Shader`: HLSL 体积云渲染与后处理源码
+* `/Assets/Ray March Resouce/Script`: 体积云渲染，径向模糊renderfeature源码
+* `/Assets/Ray March Resouce/Shader`:体积云渲染，径向模糊后处理 HLSL 源码
+* /Assets/CpmputeShaderTest/Noise/Noise Tool:噪声生成工具
