@@ -5,6 +5,9 @@
 <img src="imgs/cloud_demo.png" width="600" />
 ![体积云渲染效果](imgs/cloud_demo.png)
 
+<img src="imgs/noiseTool.png" width="600" />
+![噪声工具效果](imgs/noiseTool.png)
+
 ## ✨ 功能特性 (Features)
 *   **Unity版本**：Unity 2022.3.8f1c1
 *   **性能优化**：
