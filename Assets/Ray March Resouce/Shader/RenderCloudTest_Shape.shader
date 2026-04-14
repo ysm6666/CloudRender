@@ -221,11 +221,18 @@ Shader "RayMarching/RenderCloudTest_Shape"
                 float3 shape_offset=float3(_FlowSpeed_Shape_And_Weather.x,flowUpSpeed,_FlowSpeed_Shape_And_Weather.y)*_Time.y*_NoiseScale;
                 
                 float2 weatherUV=pos.xz*_WeatherScale;
+                
                 //解决云的重复排列问题
                 float weatherOffsetVal=SAMPLE_TEXTURE2D(_WeatherMap,sampler_WeatherMap,weatherUV*0.1).r;
                 float2 offsetUV=weatherOffsetVal*float2(1,1.2)*_UVOffsetStrength;
-               
                 float3 weather_data=SAMPLE_TEXTURE2D(_WeatherMap,sampler_WeatherMap,weatherUV+offsetUV+weather_flow_offset).rgb;
+
+                float fadeuv=1;
+                float fade=0.1;
+                fadeuv*=saturate(remap(frac(weatherUV+offsetUV+weather_flow_offset).x,0,fade,0,1))*saturate(remap(frac(weatherUV+offsetUV+weather_flow_offset).x,1-fade,1,1,0));
+                fadeuv*=saturate(remap(frac(weatherUV+offsetUV+weather_flow_offset).y,0,fade,0,1))*saturate(remap(frac(weatherUV+offsetUV+weather_flow_offset).y,1-fade,1,1,0));
+
+                weather_data*=fadeuv;
                 
                 float heightPercent=0;
                 #ifndef _Sphere_Box_Mode

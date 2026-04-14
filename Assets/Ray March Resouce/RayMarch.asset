@@ -17,7 +17,7 @@ MonoBehaviour:
     CloudMaterial: {fileID: 2100000, guid: 10681ed876792dd4ca72f00b96d78d9b, type: 2}
     Event: 550
     downsample: 1
-    useDivisionRendering: 0
+    useDivisionRendering: 1
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -96,7 +96,7 @@ MonoBehaviour:
   settings:
     raialBlurShader: {fileID: 4800000, guid: 190af7386cc897742bdf42869c0a363d, type: 3}
     BlurAmount: 100
-    lightRadius: 0.699
-    LuminanceThreshold: 0.613
-    lightStrength: 5
+    lightRadius: 0.75
+    LuminanceThreshold: 0.7
+    lightStrength: 1.5
     PassEvent: 550

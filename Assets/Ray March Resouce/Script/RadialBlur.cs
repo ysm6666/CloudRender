@@ -42,7 +42,11 @@ public class RadialBlur : ScriptableRendererFeature
             this.lightRadius = settings.lightRadius;
             this.luminanceThreshold = settings.LuminanceThreshold;
             this.lightStrength = settings.lightStrength;
-            radialBlurMaterial = new Material(settings.raialBlurShader);
+            if (radialBlurMaterial == null)
+            {
+                radialBlurMaterial = new Material(settings.raialBlurShader);
+            }
+           
         }
         
         // This method is called before executing the render pass.
@@ -95,6 +99,11 @@ public class RadialBlur : ScriptableRendererFeature
         {
             extractedRT?.Release();
             extractedRT = null;
+            if (radialBlurMaterial!=null)
+            {
+                DestroyImmediate(radialBlurMaterial);
+                radialBlurMaterial = null;
+            }
         }
         
     }

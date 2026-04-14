@@ -82,7 +82,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _WeatherMap:
-        m_Texture: {fileID: 2800000, guid: c09dadface5c874408ba10c53f7f7d7f, type: 3}
+        m_Texture: {fileID: 2800000, guid: bc830ae7850741344b2f0b6671d6de80, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _WeatherOffsetMap:
@@ -160,7 +160,7 @@ Material:
     - _SrcBlendAlpha: 1
     - _StepSize: 20
     - _Surface: 0
-    - _UVOffsetStrength: 0
+    - _UVOffsetStrength: 0.15
     - _WeatherScale: 0.00002
     - _WeatherTiling: 1
     - _WorkflowMode: 1

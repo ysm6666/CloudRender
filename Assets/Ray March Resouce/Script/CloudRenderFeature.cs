@@ -48,6 +48,7 @@ public class CloudRenderFeature : ScriptableRendererFeature
             renderCloudRT = null;
             renderCloudBackBuffer?.Release();
             renderCloudBackBuffer = null;
+            Shader.SetGlobalTexture(Shader.PropertyToID("_CloudRT"), Texture2D.blackTexture);
         }
 
         public override void OnCameraSetup(CommandBuffer cmd, ref RenderingData renderingData)
