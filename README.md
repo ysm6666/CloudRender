@@ -2,7 +2,7 @@
 
 基于 Unity Universal Render Pipeline (URP) 的风格化体积云渲染。
 
-<img src="imgs/cloud_demo.png" width="600" /><img src="imgs/noiseTool.png" width="500" height="500" /> 
+<img src="imgs/cloud_demo.png" width="600" /><img src="imgs/noiseTool.png" width="300" height="500" /> 
 
 
 
