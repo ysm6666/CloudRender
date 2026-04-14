@@ -2,7 +2,7 @@
 
 基于 Unity Universal Render Pipeline (URP) 的风格化体积云渲染。
 
-
+![体积云渲染效果](imgs/cloud_demo.gif)
 
 ## ✨ 功能特性 (Features)
 *   **Unity版本**：Unity 2022.3.8f1c1
