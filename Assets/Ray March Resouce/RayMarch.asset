@@ -15,7 +15,7 @@ MonoBehaviour:
   m_Active: 1
   settings:
     CloudMaterial: {fileID: 2100000, guid: 10681ed876792dd4ca72f00b96d78d9b, type: 2}
-    Event: 550
+    Event: 450
     downsample: 1
     useDivisionRendering: 1
 --- !u!114 &11400000
