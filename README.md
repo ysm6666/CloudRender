@@ -2,6 +2,8 @@
 
 基于 Unity Universal Render Pipeline (URP) 的风格化体积云渲染。
 
+<img src="imgs/noiseTool.png" width="300" height="400" /> <img src="imgs/cloud_demo.png" width="400" height="500"/>
+
 
 
 ## ✨ 功能特性 (Features)
@@ -12,9 +14,11 @@
     *   **降采样**：降低RT分辨率
 *   **丁达尔效应**：径向模糊后处理模拟丁达尔效应。
 *   **噪声纹理生产工具**：生成2D/3D噪声:perlin noise ; worley noise ; perlin-worley noise ;
-*                          
+                       
 
 
 ## 📂 目录结构
-* `/Assets/Scripts`: C# 渲染管线控制代码
-* `/Assets/Shader`: HLSL 体积云渲染与后处理源码
+* `/Assets/Ray March Resouce/Script`: 体积云渲染，径向模糊renderfeature源码
+* `/Assets/Ray March Resouce/Shader`:体积云渲染，径向模糊后处理 HLSL 源码
+* /Assets/CpmputeShaderTest/Noise/Noise Tool:噪声生成工具
+* Assets/Scenes/SampleScene:演示场景
